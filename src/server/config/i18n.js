@@ -36,6 +36,7 @@ i18next
     resources: {
       ar: {
         common: {
+          hi: 'مرحباً',
           welcome: 'مرحباً بك في بيبي فايب',
           appName: 'بيبي فايب',
           loading: 'جاري التحميل...',
@@ -87,6 +88,7 @@ i18next
       },
       fr: {
         common: {
+          hi: 'Salut',
           welcome: 'Bienvenue sur BabyVibe',
           appName: 'BabyVibe',
           loading: 'Chargement...',
@@ -138,6 +140,7 @@ i18next
       },
       dz: {
         common: {
+          hi: 'اهلا',
           welcome: 'مرحبا بيك في بيبي فايب',
           appName: 'بيبي فايب',
           loading: 'راه يحمل...',

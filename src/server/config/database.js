@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Skip database connection in demo environment
-    if (process.env.SKIP_DB === 'true') {
-      console.log('📦 Database connection skipped for demo');
+    // Skip database connection in demo environment or tests
+    if (process.env.SKIP_DB === 'true' || process.env.NODE_ENV === 'test') {
+      console.log('📦 Database connection skipped for demo/testing');
       return;
     }
     

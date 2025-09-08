@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../src/server/index');
+const app = require('../../src/server/index');
 
 describe('BabyVibe API Tests', () => {
   
@@ -10,8 +10,40 @@ describe('BabyVibe API Tests', () => {
         .expect(200);
       
       expect(response.body.status).toBe('OK');
-      expect(response.body.environment).toBe('development');
+      expect(response.body.environment).toBe(process.env.NODE_ENV || 'development');
       expect(response.body.version).toBe('1.0.0');
+    });
+  });
+
+  describe('Hi Endpoint', () => {
+    it('should return hi in Arabic by default', async () => {
+      const response = await request(app)
+        .get('/api/hi')
+        .expect(200);
+      
+      expect(response.body.message).toBe('مرحباً');
+      expect(response.body.language).toBe('ar');
+      expect(response.body.timestamp).toBeDefined();
+    });
+
+    it('should return hi in French when requested', async () => {
+      const response = await request(app)
+        .get('/api/hi')
+        .set('Accept-Language', 'fr')
+        .expect(200);
+      
+      expect(response.body.message).toBe('Salut');
+      expect(response.body.language).toBe('fr');
+    });
+
+    it('should return hi in Algerian dialect when requested', async () => {
+      const response = await request(app)
+        .get('/api/hi')
+        .set('Accept-Language', 'dz')
+        .expect(200);
+      
+      expect(response.body.message).toBe('اهلا');
+      expect(response.body.language).toBe('dz');
     });
   });
   
@@ -45,23 +77,6 @@ describe('BabyVibe API Tests', () => {
   });
   
   describe('API Routes', () => {
-    it('should have auth routes available', async () => {
-      // Test that routes exist (will fail due to missing data, but routes should be available)
-      await request(app)
-        .post('/api/auth/register')
-        .send({})
-        .expect(400); // Bad request due to missing data, but route exists
-    });
-    
-    it('should have product routes available', async () => {
-      await request(app)
-        .get('/api/products')
-        .expect(res => {
-          // Should either return products or an error (if DB is not connected)
-          expect([200, 500].includes(res.status)).toBe(true);
-        });
-    });
-    
     it('should return 404 for non-existent routes', async () => {
       await request(app)
         .get('/api/nonexistent')

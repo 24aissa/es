@@ -80,6 +80,25 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Simple greeting endpoint
+app.get('/api/hi', (req, res) => {
+  // Direct translation lookup based on language
+  const greetings = {
+    ar: 'مرحباً',
+    fr: 'Salut', 
+    dz: 'اهلا'
+  };
+  
+  const lang = req.language || 'ar';
+  const message = greetings[lang] || greetings['ar'];
+  
+  res.json({
+    message: message,
+    language: lang,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Serve client in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/build')));
@@ -101,11 +120,13 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 BabyVibe server running on port ${PORT}`);
-  console.log(`📱 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌍 Default language: ${process.env.DEFAULT_LANGUAGE || 'ar'}`);
-});
+// Start server only if not imported for testing
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 BabyVibe server running on port ${PORT}`);
+    console.log(`📱 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🌍 Default language: ${process.env.DEFAULT_LANGUAGE || 'ar'}`);
+  });
+}
 
 module.exports = app;
