@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../src/server/index');
+const app = require('../../src/server/index');
 
 describe('BabyVibe API Tests', () => {
   
