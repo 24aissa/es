@@ -70,6 +70,57 @@ const userSchema = new mongoose.Schema({
     rating: { type: Number, default: 0 },
     totalDeliveries: { type: Number, default: 0 }
   },
+  // Customer Service - Customer classification
+  customerClassification: {
+    type: {
+      type: String,
+      enum: ['new', 'regular', 'loyal', 'vip', 'bad'],
+      default: 'new'
+    },
+    score: { type: Number, default: 0 },
+    totalOrders: { type: Number, default: 0 },
+    totalSpent: { type: Number, default: 0 },
+    cancelledOrders: { type: Number, default: 0 },
+    returnedOrders: { type: Number, default: 0 },
+    lastOrderDate: Date,
+    flags: [{
+      type: String,
+      reason: String,
+      date: { type: Date, default: Date.now },
+      addedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    }],
+    notes: [{
+      content: String,
+      date: { type: Date, default: Date.now },
+      addedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    }]
+  },
+  // Confirmation Agent specific fields
+  agentInfo: {
+    isConfirmationAgent: { type: Boolean, default: false },
+    preferences: {
+      maxOrdersPerDay: { type: Number, default: 50 },
+      workingHours: {
+        start: { type: String, default: '09:00' },
+        end: { type: String, default: '17:00' }
+      },
+      preferredLanguages: [{ type: String, enum: ['ar', 'fr', 'dz'] }],
+      provinces: [String], // Preferred provinces
+      categories: [String] // Preferred product categories
+    },
+    performance: {
+      totalConfirmations: { type: Number, default: 0 },
+      successfulConfirmations: { type: Number, default: 0 },
+      averageResponseTime: { type: Number, default: 0 }, // in minutes
+      rating: { type: Number, default: 0 }
+    }
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -126,6 +177,98 @@ userSchema.methods.toJSON = function() {
   delete user.password;
   delete user.__v;
   return user;
+};
+
+// Method to update customer classification
+userSchema.methods.updateCustomerClassification = async function() {
+  const Order = require('./Order');
+  
+  // Get user's order statistics
+  const orderStats = await Order.aggregate([
+    { $match: { user: this._id } },
+    {
+      $group: {
+        _id: null,
+        totalOrders: { $sum: 1 },
+        totalSpent: { $sum: '$totals.total' },
+        cancelledOrders: { 
+          $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
+        },
+        returnedOrders: { 
+          $sum: { $cond: [{ $eq: ['$status', 'returned'] }, 1, 0] }
+        },
+        lastOrderDate: { $max: '$createdAt' }
+      }
+    }
+  ]);
+
+  const stats = orderStats[0] || {
+    totalOrders: 0,
+    totalSpent: 0,
+    cancelledOrders: 0,
+    returnedOrders: 0,
+    lastOrderDate: null
+  };
+
+  // Calculate classification score
+  let score = 0;
+  
+  // Positive factors
+  score += stats.totalOrders * 5; // 5 points per order
+  score += Math.floor(stats.totalSpent / 1000) * 2; // 2 points per 1000 DZD spent
+  
+  // Negative factors
+  const cancellationRate = stats.totalOrders > 0 ? stats.cancelledOrders / stats.totalOrders : 0;
+  const returnRate = stats.totalOrders > 0 ? stats.returnedOrders / stats.totalOrders : 0;
+  
+  score -= cancellationRate * 50; // Penalize high cancellation rate
+  score -= returnRate * 30; // Penalize high return rate
+  
+  // Determine classification
+  let classification = 'new';
+  if (stats.totalOrders === 0) {
+    classification = 'new';
+  } else if (score < -20 || cancellationRate > 0.5 || returnRate > 0.3) {
+    classification = 'bad';
+  } else if (score >= 100 && stats.totalSpent >= 50000) {
+    classification = 'vip';
+  } else if (score >= 50 && stats.totalOrders >= 5) {
+    classification = 'loyal';
+  } else if (stats.totalOrders >= 2) {
+    classification = 'regular';
+  }
+
+  // Update customer classification
+  this.customerClassification.type = classification;
+  this.customerClassification.score = Math.round(score);
+  this.customerClassification.totalOrders = stats.totalOrders;
+  this.customerClassification.totalSpent = stats.totalSpent;
+  this.customerClassification.cancelledOrders = stats.cancelledOrders;
+  this.customerClassification.returnedOrders = stats.returnedOrders;
+  this.customerClassification.lastOrderDate = stats.lastOrderDate;
+
+  return this.save();
+};
+
+// Method to add customer flag
+userSchema.methods.addCustomerFlag = function(type, reason, addedBy) {
+  this.customerClassification.flags.push({
+    type,
+    reason,
+    date: new Date(),
+    addedBy
+  });
+  return this.save();
+};
+
+// Method to add customer note
+userSchema.methods.addCustomerNote = function(content, addedBy) {
+  this.customerClassification.notes.push({
+    content,
+    date: new Date(),
+    addedBy
+  });
+  return this.save();
 };
 
 module.exports = mongoose.model('User', userSchema);

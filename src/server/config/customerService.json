@@ -1,0 +1,219 @@
+{
+  "confirmationStatuses": [
+    {
+      "id": "pending",
+      "name": {
+        "ar": "في الانتظار",
+        "fr": "En attente",
+        "dz": "راه يستنا"
+      },
+      "color": "#ffc107",
+      "description": {
+        "ar": "الطلب في انتظار التأكيد",
+        "fr": "Commande en attente de confirmation",
+        "dz": "الطلب راه يستنا التأكيد"
+      },
+      "isActive": true,
+      "order": 1
+    },
+    {
+      "id": "attempting",
+      "name": {
+        "ar": "جاري المحاولة",
+        "fr": "Tentative en cours",
+        "dz": "راه نحاولو"
+      },
+      "color": "#17a2b8",
+      "description": {
+        "ar": "جاري محاولة الاتصال بالعميل",
+        "fr": "Tentative de contact avec le client",
+        "dz": "راه نحاولو نكلمو العميل"
+      },
+      "isActive": true,
+      "order": 2
+    },
+    {
+      "id": "confirmed",
+      "name": {
+        "ar": "مؤكد",
+        "fr": "Confirmé",
+        "dz": "متأكد"
+      },
+      "color": "#28a745",
+      "description": {
+        "ar": "تم تأكيد الطلب من العميل",
+        "fr": "Commande confirmée par le client",
+        "dz": "العميل أكد الطلب"
+      },
+      "isActive": true,
+      "order": 3
+    },
+    {
+      "id": "failed",
+      "name": {
+        "ar": "فشل",
+        "fr": "Échec",
+        "dz": "ما نجحش"
+      },
+      "color": "#dc3545",
+      "description": {
+        "ar": "فشل في تأكيد الطلب",
+        "fr": "Échec de confirmation de commande",
+        "dz": "ما قدرناش نأكدو الطلب"
+      },
+      "isActive": true,
+      "order": 4
+    },
+    {
+      "id": "abandoned",
+      "name": {
+        "ar": "متروك",
+        "fr": "Abandonné",
+        "dz": "متروك"
+      },
+      "color": "#6c757d",
+      "description": {
+        "ar": "تم ترك الطلب بدون تأكيد",
+        "fr": "Commande abandonnée sans confirmation",
+        "dz": "الطلب متروك بلا تأكيد"
+      },
+      "isActive": true,
+      "order": 5
+    }
+  ],
+  "attemptResults": [
+    {
+      "id": "no_answer",
+      "name": {
+        "ar": "لا يجيب",
+        "fr": "Pas de réponse",
+        "dz": "ما يردش"
+      },
+      "needsReschedule": true
+    },
+    {
+      "id": "confirmed",
+      "name": {
+        "ar": "تم التأكيد",
+        "fr": "Confirmé",
+        "dz": "تأكد"
+      },
+      "needsReschedule": false
+    },
+    {
+      "id": "cancelled",
+      "name": {
+        "ar": "تم الإلغاء",
+        "fr": "Annulé",
+        "dz": "تلغا"
+      },
+      "needsReschedule": false
+    },
+    {
+      "id": "reschedule",
+      "name": {
+        "ar": "إعادة جدولة",
+        "fr": "Reprogrammer",
+        "dz": "نأجلو"
+      },
+      "needsReschedule": true
+    },
+    {
+      "id": "wrong_number",
+      "name": {
+        "ar": "رقم خاطئ",
+        "fr": "Mauvais numéro",
+        "dz": "رقم غالط"
+      },
+      "needsReschedule": false
+    },
+    {
+      "id": "busy",
+      "name": {
+        "ar": "مشغول",
+        "fr": "Occupé",
+        "dz": "مشغول"
+      },
+      "needsReschedule": true
+    }
+  ],
+  "customerClassifications": [
+    {
+      "id": "new",
+      "name": {
+        "ar": "عميل جديد",
+        "fr": "Nouveau client",
+        "dz": "عميل جديد"
+      },
+      "color": "#17a2b8",
+      "minScore": 0,
+      "maxScore": 10,
+      "priority": "normal"
+    },
+    {
+      "id": "regular",
+      "name": {
+        "ar": "عميل عادي",
+        "fr": "Client régulier",
+        "dz": "عميل عادي"
+      },
+      "color": "#28a745",
+      "minScore": 11,
+      "maxScore": 49,
+      "priority": "normal"
+    },
+    {
+      "id": "loyal",
+      "name": {
+        "ar": "عميل مخلص",
+        "fr": "Client fidèle",
+        "dz": "عميل مخلص"
+      },
+      "color": "#6f42c1",
+      "minScore": 50,
+      "maxScore": 99,
+      "priority": "high"
+    },
+    {
+      "id": "vip",
+      "name": {
+        "ar": "عميل مميز",
+        "fr": "Client VIP",
+        "dz": "عميل مميز"
+      },
+      "color": "#fd7e14",
+      "minScore": 100,
+      "maxScore": 999,
+      "priority": "urgent"
+    },
+    {
+      "id": "bad",
+      "name": {
+        "ar": "عميل سيء",
+        "fr": "Mauvais client",
+        "dz": "عميل سيء"
+      },
+      "color": "#dc3545",
+      "minScore": -999,
+      "maxScore": -1,
+      "priority": "low"
+    }
+  ],
+  "smsTemplates": {
+    "confirmation": {
+      "ar": "شكراً {{customerName}}! تم تأكيد طلبكم {{orderNumber}} بقيمة {{total}} دج. التوصيل المتوقع: {{deliveryDate}}. إيكومانجر",
+      "fr": "Merci {{customerName}}! Votre commande {{orderNumber}} de {{total}} DA est confirmée. Livraison prévue: {{deliveryDate}}. EcoManager",
+      "dz": "بارك الله فيك {{customerName}}! طلبك {{orderNumber}} بـ {{total}} دج تأكد. التوصيل: {{deliveryDate}}. إيكومانجر"
+    },
+    "reschedule": {
+      "ar": "{{customerName}}، سنعاود الاتصال بكم {{rescheduleTime}} لتأكيد طلبكم {{orderNumber}}. إيكومانجر",
+      "fr": "{{customerName}}, nous vous rappellerons le {{rescheduleTime}} pour confirmer votre commande {{orderNumber}}. EcoManager",
+      "dz": "{{customerName}}، غادي نعاودو نكلموك {{rescheduleTime}} باش نأكدو طلبك {{orderNumber}}. إيكومانجر"
+    },
+    "reminder": {
+      "ar": "تذكير: طلبكم {{orderNumber}} في انتظار التأكيد. يرجى الرد على مكالمتنا. إيكومانجر",
+      "fr": "Rappel: Votre commande {{orderNumber}} attend confirmation. Veuillez répondre à notre appel. EcoManager",
+      "dz": "تفكرة: طلبك {{orderNumber}} راه يستنا التأكيد. رد على تليفوننا من فضلك. إيكومانجر"
+    }
+  }
+}

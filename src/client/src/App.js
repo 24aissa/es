@@ -9,6 +9,7 @@ import Header from './components/Header';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import CustomerServiceDashboard from './pages/CustomerServiceDashboard';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -67,6 +68,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/customer-service" element={<CustomerServiceDashboard />} />
           </Routes>
         </MainContent>
       </Router>
