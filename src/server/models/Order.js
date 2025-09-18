@@ -153,7 +153,82 @@ const orderSchema = new mongoose.Schema({
   returnRequestDate: Date,
   returnApprovedDate: Date,
   refundAmount: Number,
-  refundDate: Date
+  refundDate: Date,
+  // Customer Service - Order Confirmation System
+  confirmation: {
+    status: {
+      type: String,
+      enum: ['pending', 'attempting', 'confirmed', 'failed', 'abandoned'],
+      default: 'pending'
+    },
+    attempts: [{
+      attemptNumber: Number,
+      agent: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      method: {
+        type: String,
+        enum: ['phone', 'sms', 'email', 'whatsapp']
+      },
+      timestamp: { type: Date, default: Date.now },
+      result: {
+        type: String,
+        enum: ['no_answer', 'confirmed', 'cancelled', 'reschedule', 'wrong_number', 'busy']
+      },
+      notes: String,
+      nextAttemptAt: Date,
+      duration: Number // in seconds
+    }],
+    assignedAgent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    assignedAt: Date,
+    confirmedAt: Date,
+    priority: {
+      type: String,
+      enum: ['low', 'normal', 'high', 'urgent'],
+      default: 'normal'
+    },
+    customStatuses: [{
+      name: String,
+      color: String,
+      description: String,
+      isActive: { type: Boolean, default: true }
+    }]
+  },
+  // Duplicate Detection
+  duplicateInfo: {
+    isDuplicate: { type: Boolean, default: false },
+    originalOrder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Order'
+    },
+    duplicateScore: Number, // 0-100 confidence score
+    detectionMethod: String,
+    detectedAt: Date,
+    checkedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
+  // SMS tracking
+  smsHistory: [{
+    type: {
+      type: String,
+      enum: ['confirmation', 'reminder', 'status_update', 'delivery_notification']
+    },
+    message: String,
+    status: {
+      type: String,
+      enum: ['sent', 'delivered', 'failed', 'pending']
+    },
+    sentAt: Date,
+    deliveredAt: Date,
+    provider: String,
+    cost: Number
+  }]
 }, {
   timestamps: true
 });
@@ -166,6 +241,13 @@ orderSchema.index({ assignedWorker: 1 });
 orderSchema.index({ 'delivery.provider': 1 });
 orderSchema.index({ 'delivery.trackingNumber': 1 });
 orderSchema.index({ createdAt: -1 });
+// Customer Service indexes
+orderSchema.index({ 'confirmation.status': 1 });
+orderSchema.index({ 'confirmation.assignedAgent': 1 });
+orderSchema.index({ 'confirmation.priority': 1 });
+orderSchema.index({ 'duplicateInfo.isDuplicate': 1 });
+orderSchema.index({ 'shippingAddress.phone': 1 });
+orderSchema.index({ user: 1, status: 1, createdAt: -1 });
 
 // Generate order number before saving
 orderSchema.pre('save', async function(next) {
@@ -272,6 +354,106 @@ orderSchema.methods.getCurrentStatusInfo = function() {
     timestamp: currentStatus ? currentStatus.timestamp : this.createdAt,
     note: currentStatus ? currentStatus.note : 'Order created'
   };
+};
+
+// Method to check for duplicates
+orderSchema.methods.checkForDuplicates = async function() {
+  const timeWindow = 24 * 60 * 60 * 1000; // 24 hours
+  const searchCriteria = {
+    _id: { $ne: this._id },
+    user: this.user,
+    createdAt: {
+      $gte: new Date(this.createdAt.getTime() - timeWindow),
+      $lte: new Date(this.createdAt.getTime() + timeWindow)
+    }
+  };
+
+  const potentialDuplicates = await this.constructor.find(searchCriteria);
+  let maxScore = 0;
+  let originalOrder = null;
+
+  for (const order of potentialDuplicates) {
+    let score = 0;
+    
+    // Same phone number
+    if (this.shippingAddress.phone === order.shippingAddress.phone) score += 30;
+    
+    // Same address
+    if (this.shippingAddress.street === order.shippingAddress.street &&
+        this.shippingAddress.city === order.shippingAddress.city) score += 25;
+    
+    // Similar total amount (within 10%)
+    const priceDiff = Math.abs(this.totals.total - order.totals.total) / this.totals.total;
+    if (priceDiff < 0.1) score += 20;
+    
+    // Same item count
+    if (this.items.length === order.items.length) score += 15;
+    
+    // Same products
+    const thisProducts = this.items.map(item => item.product.toString()).sort();
+    const orderProducts = order.items.map(item => item.product.toString()).sort();
+    if (JSON.stringify(thisProducts) === JSON.stringify(orderProducts)) score += 30;
+
+    if (score > maxScore) {
+      maxScore = score;
+      originalOrder = order._id;
+    }
+  }
+
+  if (maxScore >= 70) { // 70% threshold for duplicate
+    this.duplicateInfo = {
+      isDuplicate: true,
+      originalOrder,
+      duplicateScore: maxScore,
+      detectionMethod: 'automatic',
+      detectedAt: new Date()
+    };
+  }
+
+  return { isDuplicate: maxScore >= 70, score: maxScore, originalOrder };
+};
+
+// Method to assign to confirmation agent
+orderSchema.methods.assignToAgent = function(agentId, priority = 'normal') {
+  this.confirmation.assignedAgent = agentId;
+  this.confirmation.assignedAt = new Date();
+  this.confirmation.priority = priority;
+  this.confirmation.status = 'attempting';
+  return this.save();
+};
+
+// Method to add confirmation attempt
+orderSchema.methods.addConfirmationAttempt = function(attemptData) {
+  const attemptNumber = this.confirmation.attempts.length + 1;
+  this.confirmation.attempts.push({
+    attemptNumber,
+    ...attemptData,
+    timestamp: new Date()
+  });
+  
+  if (attemptData.result === 'confirmed') {
+    this.confirmation.status = 'confirmed';
+    this.confirmation.confirmedAt = new Date();
+    this.status = 'confirmed';
+  } else if (attemptData.result === 'cancelled') {
+    this.confirmation.status = 'failed';
+    this.status = 'cancelled';
+    this.cancelledAt = new Date();
+  }
+  
+  return this.save();
+};
+
+// Method to send SMS
+orderSchema.methods.sendSMS = function(type, message, provider = 'default') {
+  this.smsHistory.push({
+    type,
+    message,
+    status: 'sent',
+    sentAt: new Date(),
+    provider
+  });
+  return this.save();
 };
 
 // Ensure virtual fields are serialized

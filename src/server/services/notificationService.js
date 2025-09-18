@@ -153,12 +153,70 @@ const sendProductRecommendations = async (child) => {
 const initializeSchedulers = () => {
   scheduleSizeAlerts();
   scheduleProductRecommendations();
+  scheduleCustomerServiceTasks();
   
   console.log('🚀 All notification schedulers initialized');
+};
+
+// Schedule customer service automated tasks
+const scheduleCustomerServiceTasks = () => {
+  const { customerServiceService } = require('./customerServiceService');
+  const { smsService } = require('./smsService');
+  
+  // Auto-assign orders every 15 minutes during business hours
+  cron.schedule('*/15 8-18 * * 1-6', async () => {
+    try {
+      console.log('🔄 Running auto-assignment task...');
+      const result = await customerServiceService.autoAssignOrders();
+      console.log(`✅ Auto-assigned ${result.assignedCount} orders`);
+    } catch (error) {
+      console.error('❌ Error in auto-assignment task:', error);
+    }
+  });
+
+  // Detect duplicate orders every hour
+  cron.schedule('0 * * * *', async () => {
+    try {
+      console.log('🔍 Running duplicate detection...');
+      const result = await customerServiceService.detectDuplicateOrders();
+      console.log(`✅ Detected ${result.duplicatesFound} potential duplicates`);
+    } catch (error) {
+      console.error('❌ Error in duplicate detection:', error);
+    }
+  });
+
+  // Update customer classifications daily at 2 AM
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      console.log('📊 Updating customer classifications...');
+      const result = await customerServiceService.updateAllCustomerClassifications();
+      console.log(`✅ Updated ${result.updated}/${result.total} customer classifications`);
+    } catch (error) {
+      console.error('❌ Error updating customer classifications:', error);
+    }
+  });
+
+  // Send confirmation reminders every 30 minutes during business hours
+  cron.schedule('*/30 8-18 * * 1-6', async () => {
+    try {
+      console.log('📱 Sending confirmation reminders...');
+      const result = await smsService.sendConfirmationReminders();
+      console.log(`✅ Sent ${result.remindersSent} confirmation reminders`);
+    } catch (error) {
+      console.error('❌ Error sending confirmation reminders:', error);
+    }
+  });
+
+  console.log('⏰ Customer service schedulers initialized');
+  console.log('   - Auto-assignment: Every 15 minutes (8-18h, Mon-Sat)');
+  console.log('   - Duplicate detection: Every hour');
+  console.log('   - Customer classification: Daily at 2 AM');
+  console.log('   - Confirmation reminders: Every 30 minutes (8-18h, Mon-Sat)');
 };
 
 module.exports = {
   initializeSchedulers,
   sendSizeAlert,
-  sendProductRecommendations
+  sendProductRecommendations,
+  scheduleCustomerServiceTasks
 };
