@@ -1,7 +1,7 @@
 const request = require('supertest');
-const app = require('../src/server/index');
+const app = require('../../src/server/index');
 
-describe('BabyVibe API Tests', () => {
+describe('RoutePool API Tests', () => {
   
   describe('Health Check', () => {
     it('should return API health status', async () => {
@@ -10,58 +10,58 @@ describe('BabyVibe API Tests', () => {
         .expect(200);
       
       expect(response.body.status).toBe('OK');
-      expect(response.body.environment).toBe('development');
-      expect(response.body.version).toBe('1.0.0');
+      expect(response.body.service).toBe('RoutePool');
+      expect(response.body.version).toBe('0.1.0');
     });
   });
   
-  describe('Language Support', () => {
-    it('should support Arabic by default', async () => {
-      const response = await request(app)
-        .get('/api/health')
-        .expect(200);
-      
-      // Should not throw errors with Arabic language processing
-      expect(response.body).toBeDefined();
-    });
-    
-    it('should support French language', async () => {
-      const response = await request(app)
-        .get('/api/health')
-        .set('Accept-Language', 'fr')
-        .expect(200);
-      
-      expect(response.body.status).toBe('OK');
-    });
-    
-    it('should support Algerian dialect', async () => {
-      const response = await request(app)
-        .get('/api/health')
-        .set('Accept-Language', 'dz')
-        .expect(200);
-      
-      expect(response.body.status).toBe('OK');
-    });
-  });
-  
-  describe('API Routes', () => {
-    it('should have auth routes available', async () => {
-      // Test that routes exist (will fail due to missing data, but routes should be available)
+  describe('Authentication Routes', () => {
+    it('should have OTP request endpoint', async () => {
       await request(app)
-        .post('/api/auth/register')
+        .post('/api/auth/otp')
         .send({})
-        .expect(400); // Bad request due to missing data, but route exists
-    });
-    
-    it('should have product routes available', async () => {
-      await request(app)
-        .get('/api/products')
         .expect(res => {
-          // Should either return products or an error (if DB is not connected)
-          expect([200, 500].includes(res.status)).toBe(true);
+          // Should return 400 or 500 (missing phone), but route exists
+          expect([400, 500].includes(res.status)).toBe(true);
         });
     });
     
+    it('should have OTP verify endpoint', async () => {
+      await request(app)
+        .post('/api/auth/verify')
+        .send({})
+        .expect(res => {
+          // Should return 400 (missing data), but route exists
+          expect([400, 500].includes(res.status)).toBe(true);
+        });
+    });
+  });
+  
+  describe('Route Management', () => {
+    it('should require authentication for route creation', async () => {
+      await request(app)
+        .post('/api/routes')
+        .send({})
+        .expect(401); // Unauthorized without token
+    });
+    
+    it('should require authentication for nearby routes', async () => {
+      await request(app)
+        .get('/api/routes/nearby')
+        .expect(401); // Unauthorized without token
+    });
+  });
+  
+  describe('Trip Management', () => {
+    it('should require authentication for trip start', async () => {
+      await request(app)
+        .post('/api/trips/test-id/start')
+        .send({})
+        .expect(401); // Unauthorized without token
+    });
+  });
+  
+  describe('Error Handling', () => {
     it('should return 404 for non-existent routes', async () => {
       await request(app)
         .get('/api/nonexistent')
