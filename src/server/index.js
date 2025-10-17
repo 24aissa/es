@@ -2,31 +2,33 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
+const http = require('http');
+const socketIo = require('socket.io');
 
-const connectDB = require('./config/database');
-const i18n = require('./config/i18n');
+const { connectDB } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimiter } = require('./middleware/rateLimiter');
-const { initializeSchedulers } = require('./services/notificationService');
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const childRoutes = require('./routes/children');
-const productRoutes = require('./routes/products');
-const orderRoutes = require('./routes/orders');
-const workerRoutes = require('./routes/workers');
-const deliveryRoutes = require('./routes/delivery');
+const authRoutes = require('./routes/authRoutes');
+const routeRoutes = require('./routes/routeRoutes');
+const tripRoutes = require('./routes/tripRoutes');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://routepool.app']
+      : ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Connect to database
 connectDB();
-
-// Initialize notification schedulers
-initializeSchedulers();
 
 // Security middleware
 app.use(helmet({
@@ -35,15 +37,15 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", 'data:', 'https:'],
     },
   },
 }));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://babyvibe.dz', 'https://www.babyvibe.dz']
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://routepool.app']
     : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
@@ -55,20 +57,10 @@ app.use(rateLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// i18n middleware
-app.use(i18n.init);
-
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
-
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/children', childRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/workers', workerRoutes);
-app.use('/api/delivery', deliveryRoutes);
+app.use('/api/routes', routeRoutes);
+app.use('/api/trips', tripRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -76,18 +68,38 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    version: require('../../package.json').version
+    version: require('../../package.json').version,
+    service: 'RoutePool'
   });
 });
 
-// Serve client in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+// WebSocket for real-time trip tracking
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  // Join trip room
+  socket.on('join-trip', (tripId) => {
+    socket.join(`trip-${tripId}`);
+    console.log(`Client ${socket.id} joined trip ${tripId}`);
   });
-}
+
+  // Driver location update
+  socket.on('location-update', (data) => {
+    const { tripId, lat, lng } = data;
+    // Broadcast to all passengers in the trip
+    io.to(`trip-${tripId}`).emit('driver-location', { lat, lng, timestamp: new Date() });
+  });
+
+  // Leave trip room
+  socket.on('leave-trip', (tripId) => {
+    socket.leave(`trip-${tripId}`);
+    console.log(`Client ${socket.id} left trip ${tripId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
 
 // Error handling middleware (should be last)
 app.use(errorHandler);
@@ -96,16 +108,16 @@ app.use(errorHandler);
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: req.t('error.notFound'),
+    message: 'Endpoint not found',
     path: req.originalUrl
   });
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 BabyVibe server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚗 RoutePool server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌍 Default language: ${process.env.DEFAULT_LANGUAGE || 'ar'}`);
+  console.log('🌐 WebSocket enabled for real-time tracking');
 });
 
 module.exports = app;

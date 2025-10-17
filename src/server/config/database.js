@@ -1,4 +1,22 @@
-const mongoose = require('mongoose');
+const { Sequelize } = require('sequelize');
+
+const sequelize = new Sequelize(
+  process.env.DB_NAME || 'routepool',
+  process.env.DB_USER || 'postgres',
+  process.env.DB_PASSWORD || '',
+  {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    dialect: 'postgres',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  }
+);
 
 const connectDB = async () => {
   try {
@@ -7,26 +25,21 @@ const connectDB = async () => {
       console.log('📦 Database connection skipped for demo');
       return;
     }
-    
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
 
-    console.log(`🗄️  MongoDB Connected: ${conn.connection.host}`);
+    await sequelize.authenticate();
+    console.log('✅ PostgreSQL Connected successfully');
+    console.log(`📊 Database: ${process.env.DB_NAME || 'routepool'}`);
     
+    // Sync models in development
+    if (process.env.NODE_ENV === 'development') {
+      await sequelize.sync({ alter: false });
+      console.log('📋 Database models synced');
+    }
+
     // Set up connection event listeners
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('📤 MongoDB disconnected');
-    });
-
     process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      console.log('🔒 MongoDB connection closed through app termination');
+      await sequelize.close();
+      console.log('🔒 PostgreSQL connection closed through app termination');
       process.exit(0);
     });
 
@@ -40,4 +53,4 @@ const connectDB = async () => {
   }
 };
 
-module.exports = connectDB;
+module.exports = { sequelize, connectDB };
