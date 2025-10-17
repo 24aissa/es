@@ -70,7 +70,9 @@ def match_route():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log the error for debugging (do not expose to client)
+        app.logger.error(f'Route matching error: {str(e)}')
+        return jsonify({'error': 'Failed to match routes'}), 500
 
 @app.route('/api/optimize-route', methods=['POST'])
 def optimize_route():
@@ -105,7 +107,9 @@ def optimize_route():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log the error for debugging (do not expose to client)
+        app.logger.error(f'Route optimization error: {str(e)}')
+        return jsonify({'error': 'Failed to optimize route'}), 500
 
 @app.route('/api/estimate-fare', methods=['POST'])
 def estimate_fare():
@@ -138,7 +142,9 @@ def estimate_fare():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log the error for debugging (do not expose to client)
+        app.logger.error(f'Fare estimation error: {str(e)}')
+        return jsonify({'error': 'Failed to estimate fare'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
