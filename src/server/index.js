@@ -37,7 +37,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", 'data:', 'https:'],
     },
   },
 }));
@@ -117,7 +117,7 @@ app.use('*', (req, res) => {
 server.listen(PORT, () => {
   console.log(`🚗 RoutePool server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌐 WebSocket enabled for real-time tracking`);
+  console.log('🌐 WebSocket enabled for real-time tracking');
 });
 
 module.exports = app;

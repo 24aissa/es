@@ -1,6 +1,5 @@
 const { Route, Request, User, Vehicle } = require('../models');
 const { Op } = require('sequelize');
-const polyline = require('@mapbox/polyline');
 const geolib = require('geolib');
 
 // Calculate fare based on distance and time
@@ -15,218 +14,202 @@ const calculateFare = (distanceKm, durationMinutes) => {
 
 // Create a new route offer
 const createRoute = async (routeData, userId) => {
-  try {
-    const { 
-      startLat, 
-      startLng, 
-      endLat, 
-      endLng,
-      startAddress,
-      endAddress,
-      departTime,
-      seatsTotal,
-      vehicleId,
-      polylineString,
-      estimatedDistance,
-      estimatedDuration
-    } = routeData;
+  const { 
+    startLat, 
+    startLng, 
+    endLat, 
+    endLng,
+    startAddress,
+    endAddress,
+    departTime,
+    seatsTotal,
+    vehicleId,
+    polylineString,
+    estimatedDistance,
+    estimatedDuration
+  } = routeData;
 
-    // Calculate base fare
-    const baseFare = calculateFare(estimatedDistance, estimatedDuration);
+  // Calculate base fare
+  const baseFare = calculateFare(estimatedDistance, estimatedDuration);
 
-    // Create route
-    const route = await Route.create({
-      creatorId: userId,
-      polyline: polylineString,
-      startPoint: {
-        type: 'Point',
-        coordinates: [startLng, startLat]
-      },
-      endPoint: {
-        type: 'Point',
-        coordinates: [endLng, endLat]
-      },
-      startAddress,
-      endAddress,
-      departTime: new Date(departTime),
-      seatsTotal,
-      seatsLeft: seatsTotal,
-      baseFare,
-      estimatedDistance,
-      estimatedDuration,
-      vehicleId,
-      status: 'active'
-    });
+  // Create route
+  const route = await Route.create({
+    creatorId: userId,
+    polyline: polylineString,
+    startPoint: {
+      type: 'Point',
+      coordinates: [startLng, startLat]
+    },
+    endPoint: {
+      type: 'Point',
+      coordinates: [endLng, endLat]
+    },
+    startAddress,
+    endAddress,
+    departTime: new Date(departTime),
+    seatsTotal,
+    seatsLeft: seatsTotal,
+    baseFare,
+    estimatedDistance,
+    estimatedDuration,
+    vehicleId,
+    status: 'active'
+  });
 
-    return route;
-  } catch (error) {
-    throw error;
-  }
+  return route;
 };
 
 // Find nearby routes
 const findNearbyRoutes = async (params) => {
-  try {
-    const {
-      startLat,
-      startLng,
-      endLat,
-      endLng,
-      timeWindowMinutes = 120, // 2 hours
-      maxDistanceKm = 2, // 2km radius
-      departTime
-    } = params;
+  const {
+    startLat,
+    startLng,
+    endLat,
+    endLng,
+    timeWindowMinutes = 120, // 2 hours
+    maxDistanceKm = 2, // 2km radius
+    departTime
+  } = params;
 
-    // Calculate time window
-    const requestTime = departTime ? new Date(departTime) : new Date();
-    const timeWindowStart = new Date(requestTime.getTime() - (timeWindowMinutes * 60000));
-    const timeWindowEnd = new Date(requestTime.getTime() + (timeWindowMinutes * 60000));
+  // Calculate time window
+  const requestTime = departTime ? new Date(departTime) : new Date();
+  const timeWindowStart = new Date(requestTime.getTime() - (timeWindowMinutes * 60000));
+  const timeWindowEnd = new Date(requestTime.getTime() + (timeWindowMinutes * 60000));
 
-    // Find routes in time window with available seats
-    const routes = await Route.findAll({
-      where: {
-        status: 'active',
-        seatsLeft: { [Op.gt]: 0 },
-        departTime: {
-          [Op.between]: [timeWindowStart, timeWindowEnd]
-        }
+  // Find routes in time window with available seats
+  const routes = await Route.findAll({
+    where: {
+      status: 'active',
+      seatsLeft: { [Op.gt]: 0 },
+      departTime: {
+        [Op.between]: [timeWindowStart, timeWindowEnd]
+      }
+    },
+    include: [
+      {
+        model: User,
+        as: 'creator',
+        attributes: ['id', 'name', 'rating', 'totalRides']
       },
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'name', 'rating', 'totalRides']
-        },
-        {
-          model: Vehicle,
-          as: 'vehicle',
-          attributes: ['id', 'model', 'color', 'plate']
-        }
-      ],
-      order: [['departTime', 'ASC']]
-    });
+      {
+        model: Vehicle,
+        as: 'vehicle',
+        attributes: ['id', 'model', 'color', 'plate']
+      }
+    ],
+    order: [['departTime', 'ASC']]
+  });
 
-    // Filter routes by geographic proximity
-    const nearbyRoutes = routes.filter(route => {
-      const startPoint = route.startPoint.coordinates;
-      const endPoint = route.endPoint.coordinates;
+  // Filter routes by geographic proximity
+  const nearbyRoutes = routes.filter(route => {
+    const startPoint = route.startPoint.coordinates;
+    const endPoint = route.endPoint.coordinates;
 
-      const startDistance = geolib.getDistance(
-        { latitude: startLat, longitude: startLng },
-        { latitude: startPoint[1], longitude: startPoint[0] }
-      ) / 1000; // Convert to km
+    const startDistance = geolib.getDistance(
+      { latitude: startLat, longitude: startLng },
+      { latitude: startPoint[1], longitude: startPoint[0] }
+    ) / 1000; // Convert to km
 
-      const endDistance = geolib.getDistance(
-        { latitude: endLat, longitude: endLng },
-        { latitude: endPoint[1], longitude: endPoint[0] }
-      ) / 1000; // Convert to km
+    const endDistance = geolib.getDistance(
+      { latitude: endLat, longitude: endLng },
+      { latitude: endPoint[1], longitude: endPoint[0] }
+    ) / 1000; // Convert to km
 
-      return startDistance <= maxDistanceKm && endDistance <= maxDistanceKm;
-    });
+    return startDistance <= maxDistanceKm && endDistance <= maxDistanceKm;
+  });
 
-    return nearbyRoutes;
-  } catch (error) {
-    throw error;
-  }
+  return nearbyRoutes;
 };
 
 // Join a route
 const joinRoute = async (routeId, userId, requestData) => {
-  try {
-    const {
-      pickupLat,
-      pickupLng,
-      dropLat,
-      dropLng,
-      pickupAddress,
-      dropAddress,
-      seats = 1
-    } = requestData;
+  const {
+    pickupLat,
+    pickupLng,
+    dropLat,
+    dropLng,
+    pickupAddress,
+    dropAddress,
+    seats = 1
+  } = requestData;
 
-    // Find route
-    const route = await Route.findByPk(routeId);
-    if (!route) {
-      throw new Error('Route not found');
-    }
-
-    // Check availability
-    if (route.seatsLeft < seats) {
-      throw new Error('Not enough seats available');
-    }
-
-    if (route.status !== 'active') {
-      throw new Error('Route is not available');
-    }
-
-    // Calculate price and detour (simplified)
-    const detourTime = 5; // TODO: Calculate actual detour using routing API
-    const price = route.baseFare;
-
-    // Create request
-    const request = await Request.create({
-      userId,
-      routeId,
-      pickupPoint: {
-        type: 'Point',
-        coordinates: [pickupLng, pickupLat]
-      },
-      dropPoint: {
-        type: 'Point',
-        coordinates: [dropLng, dropLat]
-      },
-      pickupAddress,
-      dropAddress,
-      status: 'pending',
-      price,
-      detourTime,
-      seats
-    });
-
-    // Update route seats
-    await route.update({
-      seatsLeft: route.seatsLeft - seats,
-      status: route.seatsLeft - seats === 0 ? 'full' : 'active'
-    });
-
-    return request;
-  } catch (error) {
-    throw error;
+  // Find route
+  const route = await Route.findByPk(routeId);
+  if (!route) {
+    throw new Error('Route not found');
   }
+
+  // Check availability
+  if (route.seatsLeft < seats) {
+    throw new Error('Not enough seats available');
+  }
+
+  if (route.status !== 'active') {
+    throw new Error('Route is not available');
+  }
+
+  // Calculate price and detour (simplified)
+  const detourTime = 5; // TODO: Calculate actual detour using routing API
+  const price = route.baseFare;
+
+  // Create request
+  const request = await Request.create({
+    userId,
+    routeId,
+    pickupPoint: {
+      type: 'Point',
+      coordinates: [pickupLng, pickupLat]
+    },
+    dropPoint: {
+      type: 'Point',
+      coordinates: [dropLng, dropLat]
+    },
+    pickupAddress,
+    dropAddress,
+    status: 'pending',
+    price,
+    detourTime,
+    seats
+  });
+
+  // Update route seats
+  await route.update({
+    seatsLeft: route.seatsLeft - seats,
+    status: route.seatsLeft - seats === 0 ? 'full' : 'active'
+  });
+
+  return request;
 };
 
 // Get route details
 const getRouteDetails = async (routeId) => {
-  try {
-    const route = await Route.findByPk(routeId, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'name', 'phone', 'rating', 'totalRides']
-        },
-        {
-          model: Vehicle,
-          as: 'vehicle',
-          attributes: ['id', 'model', 'color', 'plate', 'capacity']
-        },
-        {
-          model: Request,
-          as: 'requests',
-          include: [
-            {
-              model: User,
-              as: 'user',
-              attributes: ['id', 'name', 'rating']
-            }
-          ]
-        }
-      ]
-    });
+  const route = await Route.findByPk(routeId, {
+    include: [
+      {
+        model: User,
+        as: 'creator',
+        attributes: ['id', 'name', 'phone', 'rating', 'totalRides']
+      },
+      {
+        model: Vehicle,
+        as: 'vehicle',
+        attributes: ['id', 'model', 'color', 'plate', 'capacity']
+      },
+      {
+        model: Request,
+        as: 'requests',
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'name', 'rating']
+          }
+        ]
+      }
+    ]
+  });
 
-    return route;
-  } catch (error) {
-    throw error;
-  }
+  return route;
 };
 
 module.exports = {
